@@ -22,7 +22,10 @@ pub fn build(b: *std.Build) void {
 
     const c_mod = b.addModule("c", .{
         .root_source_file = b.addWriteFiles().add("c.zig",
-            \\pub const c = @cImport(@cInclude("SDL3/SDL.h"));
+            \\pub const c = @cImport({
+            \\  @cInclude("SDL3/SDL.h");
+            \\  @cInclude("SDL3/SDL_vulkan.h");
+            \\});
         ),
         .target = target,
         .optimize = optimize,
@@ -40,6 +43,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "c", .module = c_mod },
         },
     });
+    mod.linkSystemLibrary("vulkan", .{});
 
     const exe = b.addExecutable(.{
         .name = "engine",
