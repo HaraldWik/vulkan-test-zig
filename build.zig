@@ -4,46 +4,29 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // const sdl = b.dependency("sdl", .{
-    //     .target = target,
-    //     .optimize = optimize,
-    //     .lto = optimize != .Debug,
-    //     .preferred_linkage = .dynamic,
-    // });
-
-    // const sdl_translate_c = b.addTranslateC(.{
-    //     .root_source_file = sdl.path("include/SDL3/SDL.h"),
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // sdl_translate_c.addIncludePath(sdl.path("include"));
-    // const c_mod = sdl_translate_c.createModule();
-    // c_mod.addIncludePath(sdl.path("include/"));
-
-    const c_mod = b.addModule("c", .{
-        .root_source_file = b.addWriteFiles().add("c.zig",
-            \\pub const c = @cImport({
-            \\  @cInclude("SDL3/SDL.h");
-            \\  @cInclude("SDL3/SDL_vulkan.h");
-            \\});
+    const vulkan = b.addTranslateC(.{
+        .root_source_file = b.addWriteFiles().add("c.h",
+            \\#include <vulkan/vulkan.h>
         ),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
-    });
-    c_mod.linkSystemLibrary("SDL3", .{});
+    }).createModule();
+    vulkan.linkSystemLibrary("vulkan", .{});
 
-    const wgpu_mod = b.dependency("wgpu_native_zig", .{}).module("wgpu");
+    const wio = b.dependency("wio", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("wio");
 
     const mod = b.addModule("engine", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .imports = &.{
-            .{ .name = "wgpu", .module = wgpu_mod },
-            .{ .name = "c", .module = c_mod },
+            .{ .name = "vk", .module = vulkan },
+            .{ .name = "wio", .module = wio },
         },
     });
-    mod.linkSystemLibrary("vulkan", .{});
 
     const exe = b.addExecutable(.{
         .name = "engine",
@@ -53,7 +36,6 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "engine", .module = mod },
-                .{ .name = "c", .module = c_mod },
             },
         }),
     });

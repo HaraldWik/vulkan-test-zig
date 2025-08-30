@@ -2,15 +2,10 @@
     .name = .engine,
     .version = "0.0.0",
     .fingerprint = 0xe8a81a8d38de3b1b,
-    .minimum_zig_version = "0.15.0-dev.1380+e98aeeb73",
     .dependencies = .{
-        .wgpu_native_zig = .{
-            .url = "https://github.com/bronter/wgpu_native_zig/archive/refs/tags/v6.5.0.tar.gz",
-            .hash = "wgpu_native_zig-6.5.0-B9jeDFtzAwB1vPOiXTd2BqrP1j4phYk-oBbxbpLKY3xD",
-        },
-        .sdl = .{
-            .url = "git+https://github.com/castholm/SDL.git#1994ca5dbad5a3e3c670a9ab8533d86cfd97bdc0",
-            .hash = "sdl-0.2.6+3.2.20-7uIn9NgjfwHH5a6HhyLHat2nHU3OP5B05QHhKJKuxEex",
+        .wio = .{
+            .url = "git+https://github.com/ypsvlq/wio#d4fadb3d77908395b891a39cd5a06fbabfadd69a",
+            .hash = "wio-0.0.0-8xHrr3-vBADkzn06YwWwhSfo46Z8NvbvAgA5A65S7tLQ",
         },
     },
     .paths = .{

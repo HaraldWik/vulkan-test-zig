@@ -4,9 +4,8 @@ const engine = @import("engine");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
-    _ = allocator;
 
-    const window: *engine.Window = try .init("Window", 900, 800);
+    const window: *engine.Window = try .init(allocator, "Window", 900, 800);
     defer window.deinit();
 
     const ctx: engine.gfx.Context = try .init(engine.gfx.Context.Config{
