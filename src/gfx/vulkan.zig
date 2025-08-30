@@ -1,5 +1,5 @@
 const std = @import("std");
-pub const vk = @import("vulkan");
+pub const c = @import("vulkan");
 
 pub fn vkCheck(result: vk.VkResult) !void {
     if (result != vk.VK_SUCCESS) return switch (result) {
@@ -71,10 +71,21 @@ pub const DebugMessenger = opaque {
         return @ptrCast(self);
     }
 
-    pub fn init(instance: *Instance) !*@This() {
-        const message_severity: u32 = vk.VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-            vk.VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-            vk.VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    pub const Config = struct {
+        severities: struct {
+            verbose: bool = false,
+            warning: bool = true,
+            @"error": bool = true,
+        } = .{},
+    };
+
+    pub fn init(instance: *Instance, config: Config) !*@This() {
+        // zig fmt: off
+        const message_severity: u32 = @intCast(
+            if (config.severities.verbose) c.VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT else 0 |
+            if (config.severities.warning) c.VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT else 0 |
+            if (config.severities.@"error") c.VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT else 0);
+        // zig fmt: on
 
         const message_type: u32 = vk.VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
             vk.VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
@@ -104,10 +115,10 @@ pub const DebugMessenger = opaque {
 
     fn callback(severity: vk.VkDebugUtilsMessageSeverityFlagBitsEXT, _: vk.VkDebugUtilsMessageTypeFlagsEXT, callback_data: [*c]const vk.VkDebugUtilsMessengerCallbackDataEXT, _: ?*anyopaque) callconv(.c) vk.VkBool32 {
         switch (severity) {
-            vk.VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT => std.log.info("{s}", .{callback_data.*.pMessage}),
-            vk.VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT => std.log.info("{s}", .{callback_data.*.pMessage}),
-            vk.VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT => std.log.warn("{s}", .{callback_data.*.pMessage}),
-            vk.VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT => std.log.err("{s}", .{callback_data.*.pMessage}),
+            c.VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT => std.log.info("VK {s}", .{callback_data.*.pMessage}),
+            c.VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT => std.log.info("VK {s}", .{callback_data.*.pMessage}),
+            c.VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT => std.log.warn("VK {s}", .{callback_data.*.pMessage}),
+            c.VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT => std.log.err("VK {s}", .{callback_data.*.pMessage}),
             else => unreachable,
         }
 
@@ -167,12 +178,12 @@ pub const Surface = opaque {
     }
 
     pub fn deinit(self: *@This(), instance: *Instance) void {
-        vk.vkDestroySurfaceKHR(instance.toC(), self.toC(), null);
+        c.vkDestroySurfaceKHR(instance.toC(), self.toC(), null);
     }
 };
 
 pub const PhysicalDevice = opaque {
-    pub const CType = vk.VkPhysicalDevice;
+    pub const CType = c.VkPhysicalDevice;
 
     pub inline fn toC(self: *@This()) CType {
         return @ptrCast(self);
@@ -180,27 +191,27 @@ pub const PhysicalDevice = opaque {
 
     pub fn init(instance: *Instance, surface: *Surface) !struct { *@This(), u32 } {
         var device_count: u32 = 0;
-        try vkCheck(vk.vkEnumeratePhysicalDevices(instance.toC(), &device_count, null));
+        try vkCheck(c.vkEnumeratePhysicalDevices(instance.toC(), &device_count, null));
         if (device_count == 0) return error.NoPhysicalDevices;
 
-        var devices: [8]vk.VkPhysicalDevice = undefined;
-        try vkCheck(vk.vkEnumeratePhysicalDevices(instance.toC(), &device_count, &devices));
+        var devices: [8]c.VkPhysicalDevice = undefined;
+        try vkCheck(c.vkEnumeratePhysicalDevices(instance.toC(), &device_count, &devices));
 
         for (devices[0..device_count]) |device| {
-            var properties: vk.VkPhysicalDeviceProperties = undefined;
-            vk.vkGetPhysicalDeviceProperties(device, &properties);
+            var properties: c.VkPhysicalDeviceProperties = undefined;
+            c.vkGetPhysicalDeviceProperties(device, &properties);
 
             var queue_family_count: u32 = 0;
-            vk.vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
+            c.vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
 
-            var queue_families: [16]vk.VkQueueFamilyProperties = undefined;
-            vk.vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, &queue_families);
+            var queue_families: [16]c.VkQueueFamilyProperties = undefined;
+            c.vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, &queue_families);
 
             for (queue_families[0..queue_family_count], 0..) |queue_family, queue_family_index| {
-                const supports_graphics = (queue_family.queueFlags & vk.VK_QUEUE_GRAPHICS_BIT) != 0;
+                const supports_graphics = (queue_family.queueFlags & c.VK_QUEUE_GRAPHICS_BIT) != 0;
 
-                var present_supported: vk.VkBool32 = 0;
-                try vkCheck(vk.vkGetPhysicalDeviceSurfaceSupportKHR(device, @intCast(queue_family_index), surface.toC(), &present_supported));
+                var present_supported: c.VkBool32 = 0;
+                try vkCheck(c.vkGetPhysicalDeviceSurfaceSupportKHR(device, @intCast(queue_family_index), surface.toC(), &present_supported));
 
                 if (supports_graphics and present_supported != 0) {
                     std.log.info("Picked device: {s}, queue family: {d}\n", .{ properties.deviceName, queue_family_index });
@@ -217,27 +228,27 @@ pub const PhysicalDevice = opaque {
 };
 
 pub const Device = opaque {
-    pub const CType = vk.VkDevice;
+    pub const CType = c.VkDevice;
 
     pub inline fn toC(self: *@This()) CType {
         return @ptrCast(self);
     }
 
     pub const Queue = opaque {
-        pub inline fn toC(self: *Queue) vk.VkQueue {
+        pub inline fn toC(self: *Queue) c.VkQueue {
             return @ptrCast(self);
         }
     };
 
     pub fn init(physical_device: *PhysicalDevice, queue_family_index: u32, extensions: ?[]const [*:0]const u8) !*@This() {
-        var dynamic_rendering_features: vk.VkPhysicalDeviceDynamicRenderingFeatures = .{
-            .sType = vk.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
-            .dynamicRendering = vk.VK_TRUE,
+        var dynamic_rendering_features: c.VkPhysicalDeviceDynamicRenderingFeatures = .{
+            .sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
+            .dynamicRendering = c.VK_TRUE,
         };
 
         var queue_priority: f32 = 1.0;
-        const queue_info: vk.VkDeviceQueueCreateInfo = .{
-            .sType = vk.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        const queue_info: c.VkDeviceQueueCreateInfo = .{
+            .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .pNext = &dynamic_rendering_features,
             .queueFamilyIndex = queue_family_index,
             .queueCount = 1,
@@ -245,11 +256,11 @@ pub const Device = opaque {
             .flags = 0,
         };
 
-        var features: vk.VkPhysicalDeviceFeatures = undefined;
-        vk.vkGetPhysicalDeviceFeatures(physical_device.toC(), &features);
+        var features: c.VkPhysicalDeviceFeatures = undefined;
+        c.vkGetPhysicalDeviceFeatures(physical_device.toC(), &features);
 
-        const device_info = vk.VkDeviceCreateInfo{
-            .sType = vk.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        const device_info = c.VkDeviceCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             .queueCreateInfoCount = 1,
             .pQueueCreateInfos = &queue_info,
             .pEnabledFeatures = &features,
@@ -257,46 +268,46 @@ pub const Device = opaque {
             .ppEnabledExtensionNames = if (extensions != null) extensions.?.ptr else null,
         };
 
-        var device: vk.VkDevice = undefined;
-        try vkCheck(vk.vkCreateDevice(physical_device.toC(), &device_info, null, &device));
-        var queue: vk.VkQueue = undefined;
-        vk.vkGetDeviceQueue(device, queue_family_index, 0, &queue);
+        var device: c.VkDevice = undefined;
+        try vkCheck(c.vkCreateDevice(physical_device.toC(), &device_info, null, &device));
+        var queue: c.VkQueue = undefined;
+        c.vkGetDeviceQueue(device, queue_family_index, 0, &queue);
 
         return @ptrCast(device);
     }
 
     pub fn deinit(self: *@This()) void {
-        vk.vkDestroyDevice(self.toC(), null);
+        c.vkDestroyDevice(self.toC(), null);
     }
 
     pub inline fn getQueue(self: *@This(), index: u32) Queue {
-        var queue: vk.VkQueue = undefined;
-        vk.vkGetDeviceQueue(self.toC(), index, 0, &queue);
+        var queue: c.VkQueue = undefined;
+        c.vkGetDeviceQueue(self.toC(), index, 0, &queue);
         return @ptrCast(queue);
     }
 };
 
 pub const GraphicsPipeline = opaque {
-    pub const CType = vk.VkPipeline;
+    pub const CType = c.VkPipeline;
 
     pub inline fn toC(self: *@This()) CType {
         return @ptrCast(self);
     }
 
     pub fn init(device: Device) !*@This() {
-        const create_infos: []vk.VkGraphicsPipelineCreateInfo = &.{
-            vk.VkGraphicsPipelineCreateInfo{
-                .sType = vk.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        const create_infos: []c.VkGraphicsPipelineCreateInfo = &.{
+            c.VkGraphicsPipelineCreateInfo{
+                .sType = c.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
             },
         };
 
-        var pipeline: vk.VkPipeline = undefined;
-        try vkCheck(vk.vkCreateGraphicsPipelines(device.toC(), null, @intCast(create_infos.len), create_infos.ptr, null, &pipeline));
+        var pipeline: c.VkPipeline = undefined;
+        try vkCheck(c.vkCreateGraphicsPipelines(device.toC(), null, @intCast(create_infos.len), create_infos.ptr, null, &pipeline));
 
         return @ptrCast(pipeline);
     }
 
     pub fn deinit(self: *@This()) void {
-        vk.vkDestroyDevice(self.toC(), null);
+        c.vkDestroyDevice(self.toC(), null);
     }
 };
