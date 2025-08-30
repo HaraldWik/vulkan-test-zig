@@ -23,6 +23,9 @@ pub fn init(config: Config) !@This() {
     const instance: *vk.Instance = try .init(config.instance.extensions, config.instance.layers);
     const debug_messenger: *vk.DebugMessenger = try .init(instance);
     const surface: *vk.Surface = if (config.surface.init != null and config.surface.data != null) @ptrCast(try config.surface.init.?(config.surface.data.?, instance)) else try vk.Surface.init(instance);
+    const physical_device: *vk.PhysicalDevice = try .init(instance, surface);
+    const device: *vk.Device = .init(physical_device, 0, config.device.extensions);
+    _ = device;
 
     return .{ .instance = instance, .debug_messenger = debug_messenger, .surface = surface };
 }

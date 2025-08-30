@@ -170,3 +170,133 @@ pub const Surface = opaque {
         vk.vkDestroySurfaceKHR(instance.toC(), self.toC(), null);
     }
 };
+
+pub const PhysicalDevice = opaque {
+    pub const CType = vk.VkPhysicalDevice;
+
+    pub inline fn toC(self: *@This()) CType {
+        return @ptrCast(self);
+    }
+
+    pub fn init(instance: *Instance, surface: *Surface) !struct { *@This(), u32 } {
+        var device_count: u32 = 0;
+        try vkCheck(vk.vkEnumeratePhysicalDevices(instance.toC(), &device_count, null));
+        if (device_count == 0) return error.NoPhysicalDevices;
+
+        var devices: [8]vk.VkPhysicalDevice = undefined;
+        try vkCheck(vk.vkEnumeratePhysicalDevices(instance.toC(), &device_count, &devices));
+
+        for (devices[0..device_count]) |device| {
+            var properties: vk.VkPhysicalDeviceProperties = undefined;
+            vk.vkGetPhysicalDeviceProperties(device, &properties);
+
+            var queue_family_count: u32 = 0;
+            vk.vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
+
+            var queue_families: [16]vk.VkQueueFamilyProperties = undefined;
+            vk.vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, &queue_families);
+
+            for (queue_families[0..queue_family_count], 0..) |queue_family, queue_family_index| {
+                const supports_graphics = (queue_family.queueFlags & vk.VK_QUEUE_GRAPHICS_BIT) != 0;
+
+                var present_supported: vk.VkBool32 = 0;
+                try vkCheck(vk.vkGetPhysicalDeviceSurfaceSupportKHR(device, @intCast(queue_family_index), surface.toC(), &present_supported));
+
+                if (supports_graphics and present_supported != 0) {
+                    std.log.info("Picked device: {s}, queue family: {d}\n", .{ properties.deviceName, queue_family_index });
+
+                    return .{ @ptrCast(device), @intCast(queue_family_index) };
+                }
+            }
+        }
+
+        return error.NoSuitablePhysicalDevice;
+    }
+
+    pub fn deinit(_: @This()) void {}
+};
+
+pub const Device = opaque {
+    pub const CType = vk.VkDevice;
+
+    pub inline fn toC(self: *@This()) CType {
+        return @ptrCast(self);
+    }
+
+    pub const Queue = opaque {
+        pub inline fn toC(self: *Queue) vk.VkQueue {
+            return @ptrCast(self);
+        }
+    };
+
+    pub fn init(physical_device: *PhysicalDevice, queue_family_index: u32, extensions: ?[]const [*:0]const u8) !*@This() {
+        var dynamic_rendering_features: vk.VkPhysicalDeviceDynamicRenderingFeatures = .{
+            .sType = vk.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
+            .dynamicRendering = vk.VK_TRUE,
+        };
+
+        var queue_priority: f32 = 1.0;
+        const queue_info: vk.VkDeviceQueueCreateInfo = .{
+            .sType = vk.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .pNext = &dynamic_rendering_features,
+            .queueFamilyIndex = queue_family_index,
+            .queueCount = 1,
+            .pQueuePriorities = &queue_priority,
+            .flags = 0,
+        };
+
+        var features: vk.VkPhysicalDeviceFeatures = undefined;
+        vk.vkGetPhysicalDeviceFeatures(physical_device.toC(), &features);
+
+        const device_info = vk.VkDeviceCreateInfo{
+            .sType = vk.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            .queueCreateInfoCount = 1,
+            .pQueueCreateInfos = &queue_info,
+            .pEnabledFeatures = &features,
+            .enabledExtensionCount = if (extensions != null) @intCast(extensions.?.len) else 0,
+            .ppEnabledExtensionNames = if (extensions != null) extensions.?.ptr else null,
+        };
+
+        var device: vk.VkDevice = undefined;
+        try vkCheck(vk.vkCreateDevice(physical_device.toC(), &device_info, null, &device));
+        var queue: vk.VkQueue = undefined;
+        vk.vkGetDeviceQueue(device, queue_family_index, 0, &queue);
+
+        return @ptrCast(device);
+    }
+
+    pub fn deinit(self: *@This()) void {
+        vk.vkDestroyDevice(self.toC(), null);
+    }
+
+    pub inline fn getQueue(self: *@This(), index: u32) Queue {
+        var queue: vk.VkQueue = undefined;
+        vk.vkGetDeviceQueue(self.toC(), index, 0, &queue);
+        return @ptrCast(queue);
+    }
+};
+
+pub const GraphicsPipeline = opaque {
+    pub const CType = vk.VkPipeline;
+
+    pub inline fn toC(self: *@This()) CType {
+        return @ptrCast(self);
+    }
+
+    pub fn init(device: Device) !*@This() {
+        const create_infos: []vk.VkGraphicsPipelineCreateInfo = &.{
+            vk.VkGraphicsPipelineCreateInfo{
+                .sType = vk.VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            },
+        };
+
+        var pipeline: vk.VkPipeline = undefined;
+        try vkCheck(vk.vkCreateGraphicsPipelines(device.toC(), null, @intCast(create_infos.len), create_infos.ptr, null, &pipeline));
+
+        return @ptrCast(pipeline);
+    }
+
+    pub fn deinit(self: *@This()) void {
+        vk.vkDestroyDevice(self.toC(), null);
+    }
+};
