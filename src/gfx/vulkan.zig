@@ -311,3 +311,31 @@ pub const GraphicsPipeline = opaque {
         vk.vkDestroyDevice(self.toC(), null);
     }
 };
+
+// pub const Swapchain = opaque {
+//     pub const CType = vk.VkSwapchainKHR;
+
+//     pub inline fn toC(self: *@This()) CType {
+//         return @ptrCast(self);
+//     }
+
+//     pub fn init(device: Device, surface: Surface) !*@This() {
+//         const images: []vk.VkImage = .{undefined};
+
+//         const create_info: vk.VkSwapchainCreateInfoKHR = .{
+//             .sType = vk.VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+//             .surface = surface.toC(),
+//             .minImageCount = @intCast(images.len),
+//             .imageFormat = vk.VK_IMAGE_
+//         };
+
+//         var pipeline: vk.VkPipeline = undefined;
+//         try vkCheck(vk.vkCreateGraphicsPipelines(device.toC(), null, @intCast(create_infos.len), create_infos.ptr, null, &pipeline));
+
+//         return @ptrCast(pipeline);
+//     }
+
+//     pub fn deinit(self: *@This()) void {
+//         vk.vkDestroyDevice(self.toC(), null);
+//     }
+// };
