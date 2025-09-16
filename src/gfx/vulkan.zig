@@ -57,14 +57,14 @@ pub fn VkFunc(
     };
 
     return struct {
-        pub fn load(instance: *Instance) !@typeInfo(f.@"1").optional.child {
+        pub fn load(instance: Instance) !@typeInfo(f.@"1").optional.child {
             const ptr = vk.vkGetInstanceProcAddr(instance.toC(), f.@"0") orelse return error.VkGetInstanceProcAddr;
             return @ptrCast(ptr);
         }
     };
 }
 
-pub const DebugMessenger = opaque {
+pub const DebugMessenger = *opaque {
     pub const CType = vk.VkDebugUtilsMessengerEXT;
 
     pub inline fn toC(self: *@This()) CType {
@@ -79,7 +79,7 @@ pub const DebugMessenger = opaque {
         } = .{},
     };
 
-    pub fn init(instance: *Instance, config: Config) !*@This() {
+    pub fn init(instance: Instance, config: Config) !*@This() {
         // zig fmt: off
         const message_severity: u32 = @intCast(
             if (config.severities.verbose) vk.VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT else 0 |
@@ -108,7 +108,7 @@ pub const DebugMessenger = opaque {
         return @ptrCast(messenger);
     }
 
-    pub fn deinit(self: *@This(), instance: *Instance) void {
+    pub fn deinit(self: *@This(), instance: Instance) void {
         const destroyDebugUtilsMessenger = VkFunc(.destroy_debug_utils_messenger).load(instance) catch unreachable;
         destroyDebugUtilsMessenger(instance.toC(), self.toC(), null);
     }
@@ -126,7 +126,7 @@ pub const DebugMessenger = opaque {
     }
 };
 
-pub const Instance = opaque {
+pub const Instance = *opaque {
     pub const CType = vk.VkInstance;
 
     pub inline fn toC(self: *@This()) CType {
@@ -163,33 +163,33 @@ pub const Instance = opaque {
     }
 };
 
-pub const Surface = opaque {
+pub const Surface = *opaque {
     pub const CType = vk.VkSurfaceKHR;
 
     pub inline fn toC(self: *@This()) CType {
         return @ptrCast(self);
     }
 
-    pub fn init(_: *Instance) !*@This() {
+    pub fn init(_: Instance) !*@This() {
         // TODO: Make not hard coded and allow for other windowing libraries
 
         @panic("Not implemented use the surface sub config instead");
         // return @ptrCast(null);
     }
 
-    pub fn deinit(self: *@This(), instance: *Instance) void {
+    pub fn deinit(self: *@This(), instance: Instance) void {
         vk.vkDestroySurfaceKHR(instance.toC(), self.toC(), null);
     }
 };
 
-pub const PhysicalDevice = opaque {
+pub const PhysicalDevice = *opaque {
     pub const CType = vk.VkPhysicalDevice;
 
     pub inline fn toC(self: *@This()) CType {
         return @ptrCast(self);
     }
 
-    pub fn init(instance: *Instance, surface: *Surface) !struct { *@This(), u32 } {
+    pub fn init(instance: Instance, surface: Surface, queue_family_count: *u32) !*@This() {
         var device_count: u32 = 0;
         try vkCheck(vk.vkEnumeratePhysicalDevices(instance.toC(), &device_count, null));
         if (device_count == 0) return error.NoPhysicalDevices;
@@ -201,46 +201,43 @@ pub const PhysicalDevice = opaque {
             var properties: vk.VkPhysicalDeviceProperties = undefined;
             vk.vkGetPhysicalDeviceProperties(device, &properties);
 
-            var queue_family_count: u32 = 0;
-            vk.vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, null);
+            vk.vkGetPhysicalDeviceQueueFamilyProperties(device, queue_family_count, null);
 
             var queue_families: [16]vk.VkQueueFamilyProperties = undefined;
-            vk.vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, &queue_families);
+            vk.vkGetPhysicalDeviceQueueFamilyProperties(device, queue_family_count, &queue_families);
 
-            for (queue_families[0..queue_family_count], 0..) |queue_family, queue_family_index| {
+            for (queue_families[0..queue_family_count.*], 0..) |queue_family, queue_family_index| {
                 const supports_graphics = (queue_family.queueFlags & vk.VK_QUEUE_GRAPHICS_BIT) != 0;
 
                 var present_supported: vk.VkBool32 = 0;
                 try vkCheck(vk.vkGetPhysicalDeviceSurfaceSupportKHR(device, @intCast(queue_family_index), surface.toC(), &present_supported));
 
                 if (supports_graphics and present_supported != 0) {
-                    std.log.info("Picked device: {s}, queue family: {d}\n", .{ properties.deviceName, queue_family_index });
+                    std.log.info("Picked device: {s}, queue family: {d}", .{ properties.deviceName, queue_family_index });
 
-                    return .{ @ptrCast(device), @intCast(queue_family_index) };
+                    return @ptrCast(device);
                 }
             }
         }
 
         return error.NoSuitablePhysicalDevice;
     }
-
-    pub fn deinit(_: @This()) void {}
 };
 
-pub const Device = opaque {
+pub const Device = *opaque {
     pub const CType = vk.VkDevice;
 
     pub inline fn toC(self: *@This()) CType {
         return @ptrCast(self);
     }
 
-    pub const Queue = opaque {
-        pub inline fn toC(self: *Queue) vk.VkQueue {
+    pub const Queue = *opaque {
+        pub inline fn toC(self: *@This()) vk.VkQueue {
             return @ptrCast(self);
         }
     };
 
-    pub fn init(physical_device: *PhysicalDevice, queue_family_index: u32, extensions: ?[]const [*:0]const u8) !*@This() {
+    pub fn init(physical_device: PhysicalDevice, queue_family_index: u32, extensions: ?[]const [*:0]const u8) !*@This() {
         var dynamic_rendering_features: vk.VkPhysicalDeviceDynamicRenderingFeatures = .{
             .sType = vk.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
             .dynamicRendering = vk.VK_TRUE,
@@ -287,7 +284,7 @@ pub const Device = opaque {
     }
 };
 
-pub const GraphicsPipeline = opaque {
+pub const GraphicsPipeline = *opaque {
     pub const CType = vk.VkPipeline;
 
     pub inline fn toC(self: *@This()) CType {
